@@ -20,3 +20,9 @@ def my_function(fname, lname):
 
 my_function("Emil") #error потому что функция ожидает 2 параметра а там 1
 
+def func(name = "Adik"):
+    print("Hello" + name )
+
+func("Bro")
+func("CHto")
+
