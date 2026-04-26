@@ -1,3 +1,4 @@
-Ivan,87071112233
-Asel,87475556677
-John,77019998844
+name,email,birthday,group,phone,phone_type
+Ivan,ivan@gmail.com,2000-05-12,Friend,87071112233,mobile
+Asel,asel@work.com,1999-10-01,Work,87475556677,work
+John,john@gmail.com,2001-03-22,Family,77019998844,home
