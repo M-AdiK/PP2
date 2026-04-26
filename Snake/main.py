@@ -1,186 +1,224 @@
 import pygame
 import sys
-import random
-import time
+from game import SnakeGame, load_settings, save_settings, WIDTH, HEIGHT
+from db import create_tables, get_top_10
 
-# Initialize pygame
 pygame.init()
-
-# Window and grid settings
-WIDTH = 800
-HEIGHT = 600
-CELL = 40
-FOOD_SIZE = int(CELL * 1.3)
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Snake Game")
 
-clock = pygame.time.Clock()
-
-# Colors
 WHITE = (255, 255, 255)
-RED = (200, 0, 0)
+BLACK = (0, 0, 0)
 GREEN = (0, 200, 0)
+RED = (200, 0, 0)
+GRAY = (180, 180, 180)
 
-# Fonts
 font = pygame.font.SysFont("Verdana", 24)
-game_over_font = pygame.font.SysFont("Verdana", 48)
+big_font = pygame.font.SysFont("Verdana", 48)
+small_font = pygame.font.SysFont("Verdana", 18)
 
-# Load images
-background_img = pygame.image.load("assets/images/background.png").convert()
-background_img = pygame.transform.scale(background_img, (WIDTH, HEIGHT))
+settings = load_settings()
 
-head_img = pygame.image.load("assets/images/head.png").convert_alpha()
-head_img = pygame.transform.scale(head_img, (CELL, CELL))
 
-body_img = pygame.image.load("assets/images/body.png").convert_alpha()
-body_img = pygame.transform.scale(body_img, (CELL, CELL))
+def draw_text(text, x, y, color=BLACK, used_font=font):
+    img = used_font.render(text, True, color)
+    screen.blit(img, (x, y))
 
-food_img = pygame.image.load("assets/images/food.png").convert_alpha()
 
-# Snake start position
-snake = [
-    [200, 200],
-    [160, 200],
-    [120, 200]
-]
+def button(text, x, y, w, h):
+    rect = pygame.Rect(x, y, w, h)
 
-# Start direction
-dx = CELL
-dy = 0
+    pygame.draw.rect(screen, GRAY, rect)
+    pygame.draw.rect(screen, BLACK, rect, 2)
 
-# Score, level, speed
-score = 0
-level = 1
-speed = 10
+    label = font.render(text, True, BLACK)
+    screen.blit(label, label.get_rect(center=rect.center))
 
-FOOD_LIFETIME = 7000  # 7 seconds in milliseconds
+    return rect
 
-# Generate food with random weight and timer
-def generate_food():
+
+def username_screen():
+    username = ""
+
     while True:
-        x = random.randrange(0, WIDTH, CELL)
-        y = random.randrange(0, HEIGHT, CELL)
-        if [x, y] not in snake:
-            value = random.choice([1, 3, 5, 10])          # Different weights
-            spawn_time = pygame.time.get_ticks()
-            return [x, y, value, spawn_time]
+        screen.fill(WHITE)
 
-# Show game over screen
-def show_game_over():
-    screen.blit(background_img, (0, 0))
+        draw_text("Enter Username", 210, 160, BLACK, big_font)
+        draw_text(username + "|", 300, 270, BLACK, font)
+        draw_text("Press ENTER to continue", 260, 350, BLACK, small_font)
 
-    game_over_text = game_over_font.render("Game Over", True, RED)
-    score_text = font.render(f"Final Score: {score}", True, WHITE)
-    level_text = font.render(f"Final Level: {level}", True, WHITE)
+        pygame.display.update()
 
-    screen.blit(game_over_text, game_over_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 40)))
-    screen.blit(score_text, score_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 10)))
-    screen.blit(level_text, level_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 45)))
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
-    pygame.display.update()
-    pygame.time.delay(2000)
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN and username.strip():
+                    return username.strip()
 
-# First food
-food = generate_food()
+                elif event.key == pygame.K_BACKSPACE:
+                    username = username[:-1]
 
-# Main game loop
-while True:
-    current_time = pygame.time.get_ticks()
+                elif len(username) < 15 and event.unicode.isprintable():
+                    username += event.unicode
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
 
-        # Change direction
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LEFT and dx == 0:
-                dx = -CELL
-                dy = 0
-            elif event.key == pygame.K_RIGHT and dx == 0:
-                dx = CELL
-                dy = 0
-            elif event.key == pygame.K_UP and dy == 0:
-                dx = 0
-                dy = -CELL
-            elif event.key == pygame.K_DOWN and dy == 0:
-                dx = 0
-                dy = CELL
+def main_menu():
+    username = username_screen()
 
-    # Check if current food expired
-    if current_time - food[3] > FOOD_LIFETIME:
-        food = generate_food()
+    while True:
+        screen.fill(WHITE)
 
-    # Current head
-    head_x, head_y = snake[0]
+        draw_text("Snake Game", 240, 80, GREEN, big_font)
+        draw_text(f"Player: {username}", 300, 150, BLACK, small_font)
 
-    # New head
-    new_head = [head_x + dx, head_y + dy]
+        play_btn = button("Play", 300, 220, 200, 50)
+        leaderboard_btn = button("Leaderboard", 300, 290, 200, 50)
+        settings_btn = button("Settings", 300, 360, 200, 50)
+        quit_btn = button("Quit", 300, 430, 200, 50)
 
-    # Border collision
-    if (new_head[0] < 0 or new_head[0] >= WIDTH or 
-        new_head[1] < 0 or new_head[1] >= HEIGHT):
-        show_game_over()
-        pygame.quit()
-        sys.exit()
+        pygame.display.update()
 
-    # Check if food is eaten
-    ate_food = (new_head[0] == food[0] and new_head[1] == food[1])
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
-    # Self collision
-    if ate_food:
-        if new_head in snake:
-            show_game_over()
-            pygame.quit()
-            sys.exit()
-    else:
-        if new_head in snake[:-1]:
-            show_game_over()
-            pygame.quit()
-            sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if play_btn.collidepoint(event.pos):
+                    game = SnakeGame(screen, username)
+                    score, level, best = game.run()
+                    game_over_screen(username, score, level, best)
 
-    # Move snake
-    snake.insert(0, new_head)
+                elif leaderboard_btn.collidepoint(event.pos):
+                    leaderboard_screen()
 
-    if ate_food:
-        score += food[2]                    # Add food's weight (value)
-        food = generate_food()
-    else:
-        snake.pop()
+                elif settings_btn.collidepoint(event.pos):
+                    settings_screen()
 
-    # Update level and speed
-    level = score // 5 + 1                  # Changed to 5 for better pacing
-    speed = 10 + (level - 1) * 2
+                elif quit_btn.collidepoint(event.pos):
+                    pygame.quit()
+                    sys.exit()
 
-    # Draw background
-    screen.blit(background_img, (0, 0))
 
-    # Draw snake
-    for i, segment in enumerate(snake):
-        if i == 0:
-            screen.blit(head_img, (segment[0], segment[1]))
-        else:
-            screen.blit(body_img, (segment[0], segment[1]))
+def game_over_screen(username, score, level, best):
+    while True:
+        screen.fill(WHITE)
 
-    # Draw food with size based on value + shrinking effect near expiration
-    age = current_time - food[3]
-    life_ratio = max(0.5, 1 - (age / FOOD_LIFETIME))   # shrink when almost expired
+        draw_text("Game Over", 250, 100, RED, big_font)
+        draw_text(f"Score: {score}", 320, 210, BLACK)
+        draw_text(f"Level: {level}", 320, 250, BLACK)
+        draw_text(f"Personal Best Before Game: {best}", 230, 290, BLACK, small_font)
 
-    current_size = int(FOOD_SIZE * life_ratio)
-    scaled_food = pygame.transform.scale(food_img, (current_size, current_size))
+        retry_btn = button("Retry", 300, 370, 200, 50)
+        menu_btn = button("Main Menu", 300, 440, 200, 50)
 
-    draw_x = food[0] - (current_size - CELL) // 2
-    draw_y = food[1] - (current_size - CELL) // 2
+        pygame.display.update()
 
-    screen.blit(scaled_food, (draw_x, draw_y))
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
-    # Draw score and level
-    score_text = font.render(f"Score: {score}", True, WHITE)
-    level_text = font.render(f"Level: {level}", True, WHITE)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if retry_btn.collidepoint(event.pos):
+                    game = SnakeGame(screen, username)
+                    score, level, best = game.run()
+                    return game_over_screen(username, score, level, best)
 
-    screen.blit(score_text, (10, 10))
-    screen.blit(level_text, (10, 40))
+                elif menu_btn.collidepoint(event.pos):
+                    return
 
-    pygame.display.update()
-    clock.tick(speed)
+
+def leaderboard_screen():
+    while True:
+        screen.fill(WHITE)
+
+        draw_text("Leaderboard", 250, 50, BLACK, big_font)
+
+        try:
+            rows = get_top_10()
+        except Exception as e:
+            draw_text("Database error", 300, 250, RED)
+            rows = []
+
+        y = 130
+
+        draw_text("Rank  Name        Score  Level  Date", 120, 100, BLACK, small_font)
+
+        for i, row in enumerate(rows, start=1):
+            username, score, level, played_at = row
+            date = str(played_at).split(".")[0]
+
+            text = f"{i}. {username[:10]:10} {score:5} {level:5} {date}"
+            draw_text(text, 100, y, BLACK, small_font)
+            y += 35
+
+        back_btn = button("Back", 300, 520, 200, 50)
+
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if back_btn.collidepoint(event.pos):
+                    return
+
+
+def settings_screen():
+    global settings
+
+    colors = [
+        [0, 200, 0],
+        [0, 100, 255],
+        [200, 0, 0],
+        [240, 220, 0]
+    ]
+
+    while True:
+        screen.fill(WHITE)
+
+        draw_text("Settings", 290, 80, BLACK, big_font)
+
+        grid_btn = button(f"Grid: {'ON' if settings['grid'] else 'OFF'}", 270, 190, 260, 50)
+        sound_btn = button(f"Sound: {'ON' if settings['sound'] else 'OFF'}", 270, 260, 260, 50)
+        color_btn = button("Change Snake Color", 270, 330, 260, 50)
+        save_btn = button("Save & Back", 270, 430, 260, 50)
+
+        pygame.draw.rect(screen, settings["snake_color"], (560, 340, 40, 40))
+
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                save_settings(settings)
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if grid_btn.collidepoint(event.pos):
+                    settings["grid"] = not settings["grid"]
+
+                elif sound_btn.collidepoint(event.pos):
+                    settings["sound"] = not settings["sound"]
+
+                elif color_btn.collidepoint(event.pos):
+                    current = settings["snake_color"]
+
+                    index = colors.index(current) if current in colors else 0
+                    settings["snake_color"] = colors[(index + 1) % len(colors)]
+
+                elif save_btn.collidepoint(event.pos):
+                    save_settings(settings)
+                    return
+
+
+if __name__ == "__main__":
+    create_tables()
+    main_menu()
